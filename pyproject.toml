@@ -1,0 +1,11 @@
+[project]
+name = "bincvmap"
+version = "0.1.0"
+description = "Map led strips in 3D"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.10.8",
+    "opencv-python>=4.12.0.88",
+    "pandas>=2.3.3",
+    "scipy>=1.16.3",
+]
