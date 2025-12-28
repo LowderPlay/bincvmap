@@ -1,4 +1,5 @@
 import math
+from threading import Thread
 
 import cv2
 import time
@@ -10,18 +11,39 @@ from led import NUM_LEDS, send_wled_states
 from triangulate import triangulate
 from validate import validate
 
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_EXPOSURE, -5)
-cap.set(cv2.CAP_PROP_AUTO_WB, 0)
-cap.set(cv2.CAP_PROP_WB_TEMPERATURE, 2800)
-
-CAMERA_DELAY = 0.5 # sec
+CAMERA_DELAY = 0.2 # sec
 BASE = 2
 
-if not cap.isOpened():
-    print("Cannot open camera")
-    quit()
+class VideoStream:
+    def __init__(self, src=0):
+        self.capture = cv2.VideoCapture(src)
+        self.capture.set(cv2.CAP_PROP_EXPOSURE, -5)
+        self.capture.set(cv2.CAP_PROP_AUTO_WB, 0)
+        self.capture.set(cv2.CAP_PROP_WB_TEMPERATURE, 2800)
+        self.status, self.frame = self.capture.read()
+        self.running = True
+        # Start the thread to read frames
+        self.thread = Thread(target=self.update, args=())
+        self.thread.daemon = True
+        self.thread.start()
 
+    def update(self):
+        # Keep looping and reading frames until stopped
+        while self.running:
+            self.status, self.frame = self.capture.read()
+
+    def read(self):
+        # Return the latest frame
+        return self.frame
+
+    def stop(self):
+        # Stop the thread and release the camera
+        self.running = False
+        self.thread.join()
+        self.capture.release()
+
+cap = VideoStream()
+time.sleep(1)
 
 def n_digit(a, n, b):
     for i in range(1, n + 1):
@@ -31,7 +53,7 @@ def n_digit(a, n, b):
 
 
 def get_frame(black):
-    ret, frame = cap.read()
+    frame = cap.read()
     # frame = cv2.medianBlur(frame,5)
     # black = cv2.medianBlur(black,5)
     frame = cv2.subtract(frame, black)
@@ -64,7 +86,7 @@ def pred_pixel(digits, black, count_digits, index):
 def run_webcam():
     send_wled_states(False for _ in range(NUM_LEDS))
     time.sleep(CAMERA_DELAY)
-    ret, black = cap.read()
+    black = cap.read()
     print(black.shape)
 
     count_digits = math.ceil(math.log(NUM_LEDS, BASE))
@@ -92,9 +114,9 @@ def run_webcam():
     #     coord = coords[i]
     #     send_wled_states(x == i for x in range(NUM_LEDS))
     #     time.sleep(CAMERA_DELAY)
-    #     ret, real = cap.read()
+    #     real = cap.read()
     #
-    #     if coord is not None:
+    #     if not any(np.isnan(coord)):
     #         real = cv2.circle(real, coord, 8, (0,0,255), 1)
     #
     #     cv2.imshow("final_real", real)
@@ -118,12 +140,11 @@ def bright_spot(gray_image):
     cy = int(M["m01"] / M["m00"])
     return cx, cy
 
-
 if __name__ == '__main__':
     coords1 = run_webcam()
     input("Press Enter to take next frame")
     coords2 = run_webcam()
-    cap.release()
+    cap.stop()
     cv2.destroyAllWindows()
 
     triangulated = triangulate(coords1, coords2)
