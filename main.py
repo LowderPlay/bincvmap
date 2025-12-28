@@ -11,13 +11,15 @@ from led import NUM_LEDS, send_wled_states
 from triangulate import triangulate
 from validate import validate
 
-CAMERA_DELAY = 0.2 # sec
+CAMERA_DELAY = 0.5 # sec
+EXPOSURE = 500
 BASE = 2
 
 class VideoStream:
     def __init__(self, src=0):
         self.capture = cv2.VideoCapture(src)
-        self.capture.set(cv2.CAP_PROP_EXPOSURE, -5)
+        self.capture.set(cv2.CAP_PROP_EXPOSURE, EXPOSURE)
+        self.capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
         self.capture.set(cv2.CAP_PROP_AUTO_WB, 0)
         self.capture.set(cv2.CAP_PROP_WB_TEMPERATURE, 2800)
         self.status, self.frame = self.capture.read()
@@ -108,22 +110,18 @@ def run_webcam():
         coords.append(coord)
         frames.append(frame)
 
-    # print("done")
-    #
-    # for i in range(NUM_LEDS):
-    #     coord = coords[i]
-    #     send_wled_states(x == i for x in range(NUM_LEDS))
-    #     time.sleep(CAMERA_DELAY)
-    #     real = cap.read()
-    #
-    #     if not any(np.isnan(coord)):
-    #         real = cv2.circle(real, coord, 8, (0,0,255), 1)
-    #
-    #     cv2.imshow("final_real", real)
-    #     cv2.imshow("final_pred", frames[i])
-    #     cv2.waitKey(1)
 
     return np.array(coords)
+
+def display_points(points):
+    real = cap.read()
+    for i in range(len(points)):
+        coord = points[i]
+        if not any(np.isnan(coord)):
+            real = cv2.circle(real, coord.astype(int), 4, (0,0,255), 1)
+
+    cv2.imshow("final_real", real)
+    cv2.waitKey(1)
 
 def bright_spot(gray_image):
     gray_image = np.array(gray_image * 255, dtype=np.uint8)
@@ -142,8 +140,11 @@ def bright_spot(gray_image):
 
 if __name__ == '__main__':
     coords1 = run_webcam()
+    display_points(coords1)
     input("Press Enter to take next frame")
     coords2 = run_webcam()
+    display_points(coords2)
+    input("Press Enter to exit")
     cap.stop()
     cv2.destroyAllWindows()
 
